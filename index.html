@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한글 프로그래밍 언어 IDE (H-Code Editor)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Code and UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        mainBg: '#475569',
+                        panelBg: '#334155',
+                        editorBg: '#334155',
+                        terminalBg: '#0f172a',
+                        darkBtn: '#1e293b',
+                        darkBtnHover: '#0f172a',
+                        
+                        tokenKeyword: '#f0abfc',
+                        tokenString: '#fde047',
+                        tokenNumber: '#c084fc',
+                        tokenVar: '#38bdf8',
+                        tokenOperator: '#fb923c',
+                        tokenFunc: '#34d399',
+                        tokenComment: '#94a3b8'
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans KR', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #475569;
+            color: #f8fafc;
+            overflow: hidden;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #334155;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #64748b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .editor-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .editor-textarea, .editor-highlight {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Fira Code', 'Noto Sans KR', monospace;
+            font-size: 15px;
+            line-height: 1.6;
+            padding: 12px 16px;
+            white-space: pre;
+            word-wrap: normal;
+            overflow-x: auto;
+            tab-size: 4;
+            box-sizing: border-box;
+            border: none;
+            outline: none;
+        }
+        .editor-textarea {
+            color: transparent;
+            background: transparent;
+            caret-color: #38bdf8;
+            z-index: 2;
+            resize: none;
+        }
+        .editor-highlight {
+            z-index: 1;
+            pointer-events: none;
+            color: #f8fafc;
+        }
+
+        .hl-keyword { color: #f0abfc; font-weight: bold; }
+        .hl-string { color: #fde047; font-weight: 600; }
+        .hl-number { color: #c084fc; }
+        .hl-variable { color: #38bdf8; font-weight: 500; }
+        .hl-operator { color: #fb923c; font-weight: 600; }
+        .hl-func { color: #34d399; font-weight: 600; }
+        .hl-comment { color: #94a3b8; font-style: italic; }
+
+        .line-numbers {
+            font-family: 'Fira Code', monospace;
+            font-size: 15px;
+            line-height: 1.6;
+            padding: 12px 8px;
+            text-align: right;
+            color: #94a3b8;
+            user-select: none;
+            background-color: #1e293b;
+            border-right: 1px solid #475569;
+            min-width: 45px;
+        }
+
+        .resizer {
+            width: 6px;
+            cursor: col-resize;
+            background-color: #1e293b;
+            transition: background-color 0.2s;
+        }
+        .resizer:hover, .resizer.resizing {
+            background-color: #38bdf8;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-slate-600 text-slate-100">
+
+    <header class="h-14 bg-slate-800 border-b border-slate-700 px-4 flex items-center justify-between select-none z-10 shadow-md">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-lg shadow flex items-center justify-center">
+                <i class="fa-solid font-bold fa-code text-lg"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                    한글 프로그래밍 언어 IDE
+                    <span class="text-xs font-normal px-2 py-0.5 bg-slate-700 text-slate-300 rounded border border-slate-600">초보자용</span>
+                </h1>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button id="btn-example" onclick="openModal('example-modal')" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md text-sm font-medium transition flex items-center gap-1.5 border border-slate-600 shadow-sm">
+                <i class="fa-solid fa-book-open text-amber-400"></i> 예시
+            </button>
+            <button id="btn-quiz" onclick="switchView('quiz')" class="px-3.5 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded-md text-sm font-bold transition flex items-center gap-1.5 border border-indigo-500 shadow-sm">
+                <i class="fa-solid fa-puzzle-piece text-emerald-400"></i> 문제 풀기
+            </button>
+            <button id="btn-settings" onclick="openModal('settings-modal')" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md text-sm font-medium transition flex items-center gap-1.5 border border-slate-600 shadow-sm">
+                <i class="fa-solid fa-gear text-slate-400"></i> 설정
+            </button>
+            <button id="btn-help" onclick="openModal('help-modal')" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md text-sm font-medium transition flex items-center gap-1.5 border border-slate-600 shadow-sm">
+                <i class="fa-solid fa-circle-question text-sky-400"></i> 도움말
+            </button>
+            <div class="h-5 w-px bg-slate-700 mx-1"></div>
+            <button id="btn-run" onclick="runCode()" class="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md text-sm font-bold shadow transition flex items-center gap-2 border border-emerald-500">
+                <i class="fa-solid fa-play"></i> 실행
+            </button>
+            <button id="btn-stop" onclick="stopExecution()" class="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-sm font-bold shadow transition flex items-center gap-2 hidden border border-rose-500">
+                <i class="fa-solid fa-square"></i> 중지
+            </button>
+        </div>
+    </header>
+
+    <div class="bg-slate-800/80 border-b border-slate-700 px-4 py-1.5 flex items-center gap-2 overflow-x-auto text-xs select-none">
+        <span class="text-slate-300 text-xs font-semibold flex items-center gap-1 whitespace-nowrap mr-1">
+            <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> 빠른 입력:
+        </span>
+        <button onclick="insertCode('&quot;안녕하세요&quot; 출력하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-yellow-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            "..." 출력하기
+        </button>
+        <button onclick="insertCode('&quot;이름을 입력하세요&quot; 질문 출력하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-amber-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            "..." 질문 출력하기
+        </button>
+        <button onclick="insertCode('이름을 &quot;홍길동&quot;으로 정하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-sky-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            [변수]를 [값]으로 정하기
+        </button>
+        <button onclick="insertCode('만약 조건이 참과 같다라면 실행하기:\n    &quot;참입니다&quot; 출력하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-fuchsia-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            만약 [조건]라면 실행하기:
+        </button>
+        <button onclick="insertCode('아니라면 만약 조건이 거짓과 같다라면 실행하기:\n    &quot;거짓입니다&quot; 출력하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-fuchsia-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            아니라면 만약 [조건]라면:
+        </button>
+        <button onclick="insertCode('아니라면 실행하기:\n    &quot;기타&quot; 출력하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-fuchsia-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            아니라면 실행하기:
+        </button>
+        <button onclick="insertCode('5번 반복하기:\n    &quot;반복중&quot; 출력하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-emerald-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            N번 반복하기:
+        </button>
+        <button onclick="insertCode('인사하기(이름) 함수 만들기:\n    &quot;안녕하세요, &quot; + 이름 + &quot;님!&quot; 출력하기')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-teal-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            함수명(매개변수) 함수 만들기:
+        </button>
+        <button onclick="insertCode('인사하기(&quot;세종대왕&quot;)')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-teal-300 rounded border border-slate-600 shadow-sm whitespace-nowrap font-medium">
+            함수명("값") 호출
+        </button>
+    </div>
+
+    <main id="main-container" class="flex-1 flex overflow-hidden">
+        
+        <section id="editor-panel" class="w-[60%] flex flex-col bg-slate-700 border-r border-slate-600 relative min-w-[300px]">
+            <div class="h-9 bg-slate-800 border-b border-slate-600 px-4 flex items-center justify-between select-none">
+                <div class="flex items-center space-x-2 text-xs font-medium text-slate-200">
+                    <i class="fa-regular fa-file-code text-indigo-400"></i>
+                    <span>main.hcode</span>
+                    <span id="save-status" class="text-slate-400 text-[11px]">(순수 정적 모드)</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label title="로컬 파일 열기" class="text-xs text-slate-300 hover:text-emerald-400 px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 transition border border-slate-600 shadow-sm cursor-pointer flex items-center gap-1">
+                        <i class="fa-solid fa-folder-open"></i> 열기
+                        <input type="file" accept=".hcode,.txt" onchange="uploadCode(event)" class="hidden">
+                    </label>
+                    <button onclick="downloadCode()" title="로컬 PC에 저장" class="text-xs text-slate-300 hover:text-amber-400 px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 transition border border-slate-600 shadow-sm flex items-center gap-1">
+                        <i class="fa-solid fa-download"></i> 저장
+                    </button>
+                    <button onclick="clearEditor()" title="코드 비우기" class="text-xs text-slate-300 hover:text-red-400 px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 transition border border-slate-600 shadow-sm">
+                        <i class="fa-solid fa-trash-can"></i> 지우기
+                    </button>
+                    <button onclick="copyCode()" title="코드 복사" class="text-xs text-slate-300 hover:text-sky-400 px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 transition border border-slate-600 shadow-sm">
+                        <i class="fa-regular fa-copy"></i> 복사
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 flex overflow-hidden relative bg-slate-700">
+                <div id="line-numbers" class="line-numbers overflow-hidden">1</div>
+                
+                <div class="editor-container flex-1">
+                    <div id="editor-highlight" class="editor-highlight"></div>
+                    <textarea id="code-input" class="editor-textarea" spellcheck="false" placeholder="여기에 한글 코드를 입력하세요..."></textarea>
+                </div>
+            </div>
+
+            <div class="h-6 bg-slate-800 border-t border-slate-600 px-4 flex items-center justify-between text-[11px] text-slate-400 select-none">
+                <div class="flex items-center space-x-4">
+                    <span id="cursor-pos">줄 1, 열 1</span>
+                    <span id="line-count">총 1줄</span>
+                </div>
+                <div>문법: 한글 스크립트 v1.0</div>
+            </div>
+        </section>
+
+        <div id="resizer" class="resizer"></div>
+
+        <section id="terminal-panel" class="w-[40%] flex flex-col bg-slate-900 min-w-[250px]">
+            <div class="h-9 bg-slate-800 border-b border-slate-700 px-4 flex items-center justify-between select-none">
+                <div class="flex items-center space-x-2 text-xs font-semibold text-slate-200">
+                    <i class="fa-solid fa-terminal text-emerald-400"></i>
+                    <span>실행 결과 터미널</span>
+                    <span id="exec-status" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                </div>
+                <button onclick="clearTerminal()" class="text-xs text-slate-300 hover:text-white px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 transition border border-slate-600 flex items-center gap-1">
+                    <i class="fa-solid fa-eraser"></i> 결과 지우기
+                </button>
+            </div>
+
+            <div id="terminal-output" class="flex-1 p-4 font-mono text-sm overflow-y-auto space-y-2 select-text">
+                <div class="text-slate-400 text-xs italic">
+                    프로그램 실행 준비 완료. [▶ 실행] 버튼을 눌러주세요.
+                </div>
+            </div>
+
+            <div id="terminal-input-container" class="border-t border-slate-700 p-2.5 bg-slate-800 hidden">
+                <div class="text-xs text-amber-400 font-semibold mb-1 flex items-center gap-1">
+                    <i class="fa-solid fa-comment-dots"></i> <span id="input-prompt-text">입력을 기다리는 중...</span>
+                </div>
+                <form onsubmit="submitTerminalInput(event)" class="flex gap-2">
+                    <input type="text" id="terminal-input" class="flex-1 bg-slate-900 border border-indigo-500/80 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-400 font-mono" placeholder="답변을 입력하고 Enter를 누르세요..." autocomplete="off">
+                    <button type="submit" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold transition">
+                        입력
+                    </button>
+                </form>
+            </div>
+
+            <div class="h-32 bg-slate-950 border-t border-slate-800 flex flex-col">
+                <div class="h-7 bg-slate-800/90 border-b border-slate-700/80 px-3 flex items-center justify-between text-xs text-slate-300 font-medium select-none">
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-database text-cyan-400"></i> 실시간 변수 상태</span>
+                    <span id="var-count" class="text-[11px] text-slate-400">0개 변수</span>
+                </div>
+                <div id="variable-inspector" class="flex-1 p-2 font-mono text-xs overflow-y-auto space-y-1">
+                    <div class="text-slate-500 italic text-center py-2">실행 중 저장된 변수가 여기에 표시됩니다.</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="quiz-view" class="flex-1 flex flex-col overflow-hidden bg-slate-900 hidden select-none">
+        <div class="h-12 bg-slate-800 border-b border-slate-700 px-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <button onclick="switchView('ide')" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md text-xs font-semibold transition flex items-center gap-2 border border-slate-600 shadow-sm">
+                    <i class="fa-solid fa-arrow-left"></i> IDE 메인 화면으로 돌아가기
+                </button>
+                <div class="h-4 w-px bg-slate-600"></div>
+                <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-emerald-400 text-base"></i> 한글 프로그래밍 문제 해결 코스
+                </h2>
+            </div>
+            <div class="flex items-center space-x-4 text-xs">
+                <div class="text-slate-300 font-medium">
+                    진행률: <span id="quiz-progress-text" class="text-emerald-400 font-bold">0 / 4 완료</span>
+                </div>
+                <div class="w-36 bg-slate-700 h-2.5 rounded-full overflow-hidden border border-slate-600">
+                    <div id="quiz-progress-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 flex overflow-hidden">
+            <div class="w-[35%] bg-slate-800 border-r border-slate-700 flex flex-col overflow-hidden min-w-[320px]">
+                <div class="p-3 border-b border-slate-700 bg-slate-900/40">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>실습 문제 목록</span>
+                        <span class="text-[11px] text-slate-500 font-normal">문제를 클릭하세요</span>
+                    </div>
+                    <div id="quiz-tabs-container" class="space-y-1.5"></div>
+                </div>
+
+                <div class="flex-1 p-5 overflow-y-auto space-y-4 text-slate-200">
+                    <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                        <span id="quiz-card-level" class="text-xs px-2.5 py-0.5 rounded font-semibold bg-amber-950 text-amber-300 border border-amber-800">쉬움</span>
+                        <span id="quiz-card-status" class="text-xs px-2.5 py-0.5 rounded font-semibold bg-slate-700 text-slate-400">미완료</span>
+                    </div>
+
+                    <div>
+                        <h3 id="quiz-card-title" class="text-base font-bold text-slate-100 mb-2">1. 빈칸 채우기 (출력문)</h3>
+                        <div id="quiz-card-desc" class="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-lg border border-slate-700/80"></div>
+                    </div>
+                    
+                    <div class="bg-indigo-950/40 p-4 rounded-xl border border-indigo-800/60 space-y-2">
+                        <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-lightbulb"></i> 해결 목표 및 힌트
+                        </div>
+                        <div id="quiz-card-hint" class="text-xs text-indigo-200 leading-relaxed"></div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-700">
+                        <button onclick="loadCurrentQuizToIDE()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-sky-300 rounded-lg text-xs font-semibold transition border border-slate-600 flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-file-export"></i> 이 문제를 메인 IDE 에디터로 가져가기
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-[65%] flex flex-col bg-slate-900 overflow-hidden">
+                <div class="h-10 bg-slate-800 border-b border-slate-700 px-4 flex items-center justify-between select-none">
+                    <div class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-code text-indigo-400"></i> 문제 풀이 코드 작성
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="resetQuizCode()" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-xs font-medium transition border border-slate-600">
+                            <i class="fa-solid fa-rotate-left"></i> 코드 초기화
+                        </button>
+                        <button onclick="runQuizCode()" class="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition flex items-center gap-1.5 shadow">
+                            <i class="fa-solid fa-play"></i> 코드 실행
+                        </button>
+                        <button onclick="submitQuizAnswer()" class="px-4 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold transition flex items-center gap-1.5 shadow border border-indigo-400">
+                            <i class="fa-solid fa-check-circle"></i> 정답 제출 & 검증
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative editor-container bg-slate-700 overflow-hidden">
+                    <div id="quiz-editor-highlight" class="editor-highlight"></div>
+                    <textarea id="quiz-code-input" class="editor-textarea" spellcheck="false" placeholder="여기에 한글 정답 코드를 작성하세요..."></textarea>
+                </div>
+
+                <div class="h-56 bg-slate-950 border-t border-slate-800 flex flex-col">
+                    <div class="h-8 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between text-xs text-slate-400 select-none">
+                        <span class="font-semibold flex items-center gap-1.5 text-slate-300">
+                            <i class="fa-solid fa-terminal text-emerald-400"></i> 실시간 채점 및 실행 결과
+                        </span>
+                        <button onclick="clearQuizTerminal()" class="hover:text-slate-200">
+                            <i class="fa-solid fa-eraser"></i> 지우기
+                        </button>
+                    </div>
+                    <div id="quiz-terminal-output" class="flex-1 p-3.5 font-mono text-xs overflow-y-auto space-y-1.5 select-text">
+                        <div class="text-slate-500 italic">코드를 작성한 후 [코드 실행] 또는 [정답 제출 & 검증] 버튼을 눌러주세요.</div>
+                    </div>
+
+                    <div id="quiz-terminal-input-container" class="border-t border-slate-800 p-2.5 bg-slate-900 hidden">
+                        <div class="text-xs text-amber-400 font-semibold mb-1 flex items-center gap-1">
+                            <i class="fa-solid fa-comment-dots"></i> <span id="quiz-input-prompt-text">입력을 기다리는 중...</span>
+                        </div>
+                        <form onsubmit="submitQuizTerminalInput(event)" class="flex gap-2">
+                            <input type="text" id="quiz-terminal-input" class="flex-1 bg-slate-950 border border-indigo-500/80 rounded px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-400 font-mono" placeholder="답변을 입력하고 Enter를 누르세요..." autocomplete="off">
+                            <button type="submit" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold transition">
+                                입력
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EXAMPLES -->
+    <div id="example-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-[680px] max-w-[92vw] shadow-2xl flex flex-col overflow-hidden text-slate-100 max-h-[85vh]">
+            <div class="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-900/60">
+                <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-amber-400"></i> 예제 프로그램 (10개)
+                </h3>
+                <button onclick="closeModal('example-modal')" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3 overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    <button onclick="loadSample('greeting')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-yellow-300">1. 사용자 맞춤 인사</span>
+                            <span class="text-[11px] bg-slate-800 text-yellow-300 px-2 py-0.5 rounded border border-slate-600">조건문</span>
+                        </div>
+                        <div class="text-xs text-slate-300">이름을 입력받고 조건에 따라 다르게 인사하기</div>
+                    </button>
+
+                    <button onclick="loadSample('countdown')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-emerald-300">2. 카운트다운</span>
+                            <span class="text-[11px] bg-slate-800 text-emerald-300 px-2 py-0.5 rounded border border-slate-600">반복문</span>
+                        </div>
+                        <div class="text-xs text-slate-300">N번 반복하기로 숫자를 1씩 늘리며 출력하기</div>
+                    </button>
+
+                    <button onclick="loadSample('func_demo')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-sky-300">3. 맞춤 인사 함수</span>
+                            <span class="text-[11px] bg-slate-800 text-sky-300 px-2 py-0.5 rounded border border-slate-600">함수</span>
+                        </div>
+                        <div class="text-xs text-slate-300">함수를 만들어 매개변수로 이름을 받아 호출하기</div>
+                    </button>
+
+                    <button onclick="loadSample('gugudan')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-fuchsia-300">4. 구구단 2단 출력</span>
+                            <span class="text-[11px] bg-slate-800 text-fuchsia-300 px-2 py-0.5 rounded border border-slate-600">연산/반복</span>
+                        </div>
+                        <div class="text-xs text-slate-300">반복문과 곱셈 연산으로 2단 완성하기</div>
+                    </button>
+
+                    <button onclick="loadSample('even_odd')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-amber-300">5. 행운의 숫자 판별</span>
+                            <span class="text-[11px] bg-slate-800 text-amber-300 px-2 py-0.5 rounded border border-slate-600">비교 연산</span>
+                        </div>
+                        <div class="text-xs text-slate-300">입력받은 숫자와 행운의 숫자 비교하기</div>
+                    </button>
+
+                    <button onclick="loadSample('grade_calc')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-teal-300">6. 점수 등급 판별</span>
+                            <span class="text-[11px] bg-slate-800 text-teal-300 px-2 py-0.5 rounded border border-slate-600">다중 조건</span>
+                        </div>
+                        <div class="text-xs text-slate-300">점수 범위에 따라 A, B, C 등급 판별하기</div>
+                    </button>
+
+                    <button onclick="loadSample('sum_n')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-cyan-300">7. 1부터 5까지 더하기</span>
+                            <span class="text-[11px] bg-slate-800 text-cyan-300 px-2 py-0.5 rounded border border-slate-600">변수 누적</span>
+                        </div>
+                        <div class="text-xs text-slate-300">합계 변수에 숫자를 누적 연산하기</div>
+                    </button>
+
+                    <button onclick="loadSample('quiz_game')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-rose-300">8. 수도 맞히기 퀴즈</span>
+                            <span class="text-[11px] bg-slate-800 text-rose-300 px-2 py-0.5 rounded border border-slate-600">대화형 퀴즈</span>
+                        </div>
+                        <div class="text-xs text-slate-300">질문을 던지고 정답 여부를 판단하는 게임</div>
+                    </button>
+
+                    <button onclick="loadSample('compare_num')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-indigo-300">9. 문자열 비교 및 검증</span>
+                            <span class="text-[11px] bg-slate-800 text-indigo-300 px-2 py-0.5 rounded border border-slate-600">논리 판단</span>
+                        </div>
+                        <div class="text-xs text-slate-300">좌변과 우변의 호응 조사를 통한 값 검증</div>
+                    </button>
+
+                    <button onclick="loadSample('intro_card')" class="p-3 bg-slate-700/60 hover:bg-slate-700 rounded-lg text-left border border-slate-600 transition flex flex-col justify-between">
+                        <div class="flex items-center justify-between w-full mb-1">
+                            <span class="text-sm font-semibold text-violet-300">10. 자기소개 카드 생성</span>
+                            <span class="text-[11px] bg-slate-800 text-violet-300 px-2 py-0.5 rounded border border-slate-600">종합</span>
+                        </div>
+                        <div class="text-xs text-slate-300">이름과 취미를 받아 종합 출력하기</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SETTINGS -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-[450px] max-w-[90vw] shadow-2xl flex flex-col overflow-hidden text-slate-100">
+            <div class="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-900/60">
+                <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-indigo-400"></i> 환경 설정
+                </h3>
+                <button onclick="closeModal('settings-modal')" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4 text-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="font-medium text-slate-200">에디터 글자 크기</div>
+                        <div class="text-xs text-slate-400">코드 에디터와 터미널의 폰트 크기</div>
+                    </div>
+                    <select id="setting-fontsize" onchange="changeFontSize(this.value)" class="bg-slate-700 border border-slate-600 rounded px-2.5 py-1 text-sm text-slate-100 focus:outline-none focus:border-indigo-400">
+                        <option value="13">13px (작게)</option>
+                        <option value="15" selected>15px (보통)</option>
+                        <option value="18">18px (크게)</option>
+                        <option value="20">20px (매우 크게)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center justify-between border-t border-slate-700 pt-3">
+                    <div>
+                        <div class="font-medium text-slate-200">자동 들여쓰기</div>
+                        <div class="text-xs text-slate-400">콜론(:) 입력 후 Enter 누를 때 자동 들여쓰기</div>
+                    </div>
+                    <input type="checkbox" id="setting-autoindent" checked class="w-4 h-4 accent-indigo-500 rounded">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HELP -->
+    <div id="help-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-[650px] max-w-[92vw] shadow-2xl flex flex-col overflow-hidden max-h-[85vh] text-slate-100">
+            <div class="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-900/60">
+                <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-indigo-400"></i> 한글 프로그래밍 언어 도움말
+                </h3>
+                <button onclick="closeModal('help-modal')" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-5 overflow-y-auto space-y-6 text-sm text-slate-200 leading-relaxed">
+                <div>
+                    <h4 class="text-base font-bold text-yellow-300 border-b border-slate-700 pb-1 mb-2">1. 출력과 입력</h4>
+                    <ul class="list-disc list-inside space-y-1 text-xs font-mono">
+                        <li><b class="text-yellow-300">"내용" 출력하기</b> : 화면에 글자나 변수의 값을 출력합니다.</li>
+                        <li><b class="text-amber-300">"질문" 질문 출력하기</b> : 사용자에게 질문을 하고 입력값을 받습니다.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-base font-bold text-sky-300 border-b border-slate-700 pb-1 mb-2">2. 변수와 조건문</h4>
+                    <ul class="list-disc list-inside space-y-1 text-xs font-mono">
+                        <li><b class="text-sky-300">변수이름을 값으로 정하기</b> : 변수에 값을 저장합니다.</li>
+                        <li><b class="text-fuchsia-300">만약 조건이 참과 같다라면 실행하기:</b> : 조건에 따른 분기 처리</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-base font-bold text-teal-300 border-b border-slate-700 pb-1 mb-2">3. 함수 만들기 및 호출</h4>
+                    <ul class="list-disc list-inside space-y-1 text-xs font-mono">
+                        <li><b class="text-teal-300">함수명(매개변수) 함수 만들기:</b> : 함수를 정의합니다.</li>
+                        <li><b class="text-teal-300">함수명("값")</b> : 정의된 함수를 호출하여 실행합니다.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Default Sample Code Definitions
+        const SAMPLE_USER_EXAMPLE = `"안녕하세요" 출력하기
+이름을 "이름을 입력하세요" 질문 출력하기로 정하기
+만약 이름이 "세종대왕"과 같다라면 실행하기:
+    "대왕님 안녕하세요" 출력하기
+아니라면 만약 이름이 "이순신"과 같다라면 실행하기:
+    "장군님 안녕하세요" 출력하기
+아니라면 실행하기:
+    "손님 안녕하세요" 출력하기`;
+
+        const SAMPLE_COUNTDOWN = `# 3번 카운트다운 반복 예제
+"3초 카운트다운을 시작합니다!" 출력하기
+3번 반복하기:
+    "카운트다운 진행 중..." 출력하기
+"카운트다운 완료!" 출력하기`;
+
+        const SAMPLE_FUNC = `# 맞춤 인사 함수 정의 및 호출 예제
+인사하기(이름) 함수 만들기:
+    "반갑습니다, " + 이름 + "님!" 출력하기
+
+인사하기("세종대왕")
+인사하기("이순신")`;
+
+        const SAMPLE_GUGUDAN = `# 구구단 2단 출력 예제
+"--- 구구단 2단 ---" 출력하기
+9번 반복하기:
+    "2단 공부 중!" 출력하기`;
+
+        const SAMPLE_EVEN_ODD = `# 행운의 숫자 판별 예제
+숫자를 "7"로 정하기
+만약 숫자가 "7"과 같다라면 실행하기:
+    "행운의 숫자 7입니다!" 출력하기
+아니라면 실행하기:
+    "행운의 숫자가 아닙니다." 출력하기`;
+
+        const SAMPLE_GRADE = `# 점수 등급 판별 다중 조건 예제
+점수를 95로 정하기
+만약 점수가 90보다 크거나 같다라면 실행하기:
+    "A 등급입니다!" 출력하기
+아니라면 만약 점수가 80보다 크거나 같다라면 실행하기:
+    "B 등급입니다!" 출력하기
+아니라면 실행하기:
+    "C 등급입니다!" 출력하기`;
+
+        const SAMPLE_SUM_N = `# 메시지 반복 연산 예제
+합계를 "0"으로 정하기
+"합계 계산을 준비합니다." 출력하기
+5번 반복하기:
+    "숫자를 누적하여 더하는 중..." 출력하기
+"계산 완료!" 출력하기`;
+
+        const SAMPLE_QUIZ_GAME = `# 수도 맞히기 퀴즈 게임
+답을 "대한민국의 수도는 어디일까요?" 질문 출력하기로 정하기
+만약 답이 "서울"과 같다라면 실행하기:
+    "정답입니다! 100점!" 출력하기
+아니라면 실행하기:
+    "틀렸습니다. 정답은 서울입니다." 출력하기`;
+
+        const SAMPLE_COMPARE = `# 암호 비교 검증 예제
+입력값을 "비밀 암호를 입력하세요" 질문 출력하기로 정하기
+만약 입력값이 "한글123"과 같다라면 실행하기:
+    "비밀 통로가 열렸습니다." 출력하기
+아니라면 실행하기:
+    "경고: 암호가 올바르지 않습니다." 출력하기`;
+
+        const SAMPLE_INTRO = `# 자기소개 카드 생성기
+이름을 "이름을 입력하세요" 질문 출력하기로 정하기
+취미를 "취미를 입력하세요" 질문 출력하기로 정하기
+"====================" 출력하기
+" [ 자기소개 카드 ]" 출력하기
+" 이름: " + 이름 출력하기
+" 취미: " + 취미 출력하기
+"====================" 출력하기`;
+
+        // Quiz Course Definitions
+        const QUIZ_COURSE = [
+            {
+                id: 1,
+                title: "1. 빈칸 채우기 (출력문)",
+                level: "쉬움",
+                levelColor: "amber",
+                desc: "화면에 <b>\"한글 프로그래밍 파이팅!\"</b>이라는 글자를 출력하는 코드를 완성해보세요.",
+                starterCode: `# [문제 1] "한글 프로그래밍 파이팅!"을 출력하세요.\n"한글 프로그래밍 파이팅!" 출력하기`,
+                hint: "<b>출력하기</b> 키워드를 문장 끝에 붙여 입력하세요.",
+                check: (output, code) => output.includes("한글 프로그래밍 파이팅!") && code.includes("출력하기")
+            },
+            {
+                id: 2,
+                title: "2. 조건문 완성하기 (성인 판별)",
+                level: "보통",
+                levelColor: "emerald",
+                desc: "나이가 20 이상이면 <b>\"성인입니다\"</b>를 출력하는 조건문 식을 작성해보세요.",
+                starterCode: `# [문제 2] 나이가 20 이상일 때 "성인입니다"를 출력하도록 조건문을 작성하세요.\n나이를 "20"으로 정하기\n만약 나이가 20보다 크거나 같다라면 실행하기:\n    "성인입니다" 출력하기`,
+                hint: "<b>크거나 같다라면 실행하기:</b> 구문을 완성하세요.",
+                check: (output, code) => output.includes("성인입니다") && (code.includes("크거나 같다") || code.includes("같다라면"))
+            },
+            {
+                id: 3,
+                title: "3. 반복문 활용 (3번 인사)",
+                level: "보통",
+                levelColor: "sky",
+                desc: "화면에 <b>\"안녕하세요\"</b>를 정확히 <b>3번</b> 반복해서 출력하는 코드를 완성하세요.",
+                starterCode: `# [문제 3] "안녕하세요"를 3번 반복해서 출력하세요.\n3번 반복하기:\n    "안녕하세요" 출력하기`,
+                hint: "<b>3번 반복하기:</b> 구문을 첫 번째 줄에 작성해보세요.",
+                check: (output, code) => {
+                    const matches = (output.match(/안녕하세요/g) || []).length;
+                    return matches === 3 && code.includes("반복하기");
+                }
+            },
+            {
+                id: 4,
+                title: "4. 종합 퀴즈 프로그램 (비밀번호 맞히기)",
+                level: "도전",
+                levelColor: "purple",
+                desc: "비밀번호 질문을 출력한 뒤, 입력받은 값이 <b>\"1234\"</b>와 같으면 <b>\"열렸습니다\"</b>, 아니면 <b>\"틀렸습니다\"</b>를 출력하도록 만드세요.",
+                starterCode: `# [문제 4] 비밀번호 맞히기 프로그램을 작성하세요.\n암호를 "비밀번호를 입력하세요" 질문 출력하기로 정하기\n만약 암호가 "1234"와 같다라면 실행하기:\n    "열렸습니다" 출력하기\n아니라면 실행하기:\n    "틀렸습니다" 출력하기`,
+                hint: "<b>\"1234\"와 같다라면 실행하기:</b> 구문과 <b>아니라면 실행하기:</b>를 활용해보세요.",
+                check: (output, code) => (output.includes("열렸습니다") || output.includes("틀렸습니다")) && code.includes("같다라면") && code.includes("아니라면")
+            }
+        ];
+
+        // System State Variables
+        let currentView = 'ide';
+        let currentQuizIdx = 0;
+        let quizStatus = [false, false, false, false];
+        let quizCodes = QUIZ_COURSE.map(q => q.starterCode);
+
+        let isRunning = false;
+        let pendingInputResolve = null;
+        let globalVariables = {};
+        let customFunctions = {};
+        let outputHandler = null;
+        let mockInputQueue = null;
+
+        // DOM Elements
+        const codeInput = document.getElementById('code-input');
+        const codeHighlight = document.getElementById('editor-highlight');
+        const lineNumbers = document.getElementById('line-numbers');
+        const terminalOutput = document.getElementById('terminal-output');
+        const varInspector = document.getElementById('variable-inspector');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            codeInput.value = SAMPLE_USER_EXAMPLE;
+            updateEditor();
+            setupSplitResizer();
+            renderQuizTabs();
+
+            codeInput.addEventListener('input', updateEditor);
+            codeInput.addEventListener('scroll', syncScroll);
+            codeInput.addEventListener('keydown', handleKeyDown);
+            codeInput.addEventListener('click', updateCursorPos);
+            codeInput.addEventListener('keyup', updateCursorPos);
+
+            const quizInput = document.getElementById('quiz-code-input');
+            if (quizInput) {
+                quizInput.addEventListener('input', () => {
+                    quizCodes[currentQuizIdx] = quizInput.value;
+                    updateQuizEditor();
+                });
+                quizInput.addEventListener('scroll', syncQuizScroll);
+                quizInput.addEventListener('keydown', handleQuizKeyDown);
+            }
+        });
+
+        function handleQuizKeyDown(e) {
+            const quizInput = document.getElementById('quiz-code-input');
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = quizInput.selectionStart;
+                const end = quizInput.selectionEnd;
+                quizInput.value = quizInput.value.substring(0, start) + "    " + quizInput.value.substring(end);
+                quizInput.selectionStart = quizInput.selectionEnd = start + 4;
+                quizCodes[currentQuizIdx] = quizInput.value;
+                updateQuizEditor();
+            }
+        }
+
+        function switchView(viewName) {
+            currentView = viewName;
+            const mainIde = document.getElementById('main-container');
+            const quizView = document.getElementById('quiz-view');
+            const quickToolbar = document.querySelector('.bg-slate-800\\/80');
+
+            if (viewName === 'quiz') {
+                mainIde.classList.add('hidden');
+                if (quickToolbar) quickToolbar.classList.add('hidden');
+                quizView.classList.remove('hidden');
+                selectQuiz(currentQuizIdx);
+            } else {
+                quizView.classList.add('hidden');
+                mainIde.classList.remove('hidden');
+                if (quickToolbar) quickToolbar.classList.remove('hidden');
+                updateEditor();
+            }
+        }
+
+        function renderQuizTabs() {
+            const container = document.getElementById('quiz-tabs-container');
+            container.innerHTML = QUIZ_COURSE.map((q, idx) => {
+                const isPassed = quizStatus[idx];
+                const isActive = idx === currentQuizIdx;
+                
+                let activeStyle = isActive 
+                    ? 'bg-slate-700 border-indigo-500 shadow text-white' 
+                    : 'bg-slate-900/60 border-slate-700/80 hover:bg-slate-700/50 text-slate-300';
+
+                return `
+                    <button onclick="selectQuiz(${idx})" class="w-full p-2.5 rounded-lg border text-left transition flex items-center justify-between ${activeStyle}">
+                        <div class="flex items-center space-x-2 overflow-hidden">
+                            <span class="text-xs font-bold text-slate-200 truncate">${q.title}</span>
+                        </div>
+                        ${isPassed 
+                            ? '<span class="text-[10px] px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-full font-bold flex items-center gap-1"><i class="fa-solid fa-check"></i> 성공</span>' 
+                            : '<span class="text-[10px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded-full">도전중</span>'}
+                    </button>
+                `;
+            }).join('');
+
+            const passedCount = quizStatus.filter(Boolean).length;
+            document.getElementById('quiz-progress-text').innerText = `${passedCount} / ${QUIZ_COURSE.length} 완료`;
+            document.getElementById('quiz-progress-bar').style.width = `${(passedCount / QUIZ_COURSE.length) * 100}%`;
+        }
+
+        function selectQuiz(idx) {
+            currentQuizIdx = idx;
+            const q = QUIZ_COURSE[idx];
+            
+            document.getElementById('quiz-card-title').innerText = q.title;
+            document.getElementById('quiz-card-desc').innerHTML = q.desc;
+            document.getElementById('quiz-card-hint').innerHTML = q.hint;
+            document.getElementById('quiz-card-level').innerText = `난이도: ${q.level}`;
+            
+            const statusBadge = document.getElementById('quiz-card-status');
+            if (quizStatus[idx]) {
+                statusBadge.className = "text-xs px-2.5 py-0.5 rounded font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800";
+                statusBadge.innerText = "통과함";
+            } else {
+                statusBadge.className = "text-xs px-2.5 py-0.5 rounded font-semibold bg-slate-700 text-slate-400";
+                statusBadge.innerText = "미완료";
+            }
+
+            const quizInput = document.getElementById('quiz-code-input');
+            quizInput.value = quizCodes[idx];
+            updateQuizEditor();
+            renderQuizTabs();
+        }
+
+        function resetQuizCode() {
+            quizCodes[currentQuizIdx] = QUIZ_COURSE[currentQuizIdx].starterCode;
+            document.getElementById('quiz-code-input').value = quizCodes[currentQuizIdx];
+            updateQuizEditor();
+            appendQuizOutput('코드가 초기화되었습니다.', 'system');
+        }
+
+        function clearQuizTerminal() {
+            document.getElementById('quiz-terminal-output').innerHTML = '';
+        }
+
+        function appendQuizOutput(msg, type = 'normal') {
+            const term = document.getElementById('quiz-terminal-output');
+            const div = document.createElement('div');
+            if (type === 'error') {
+                div.className = 'text-red-400 font-semibold bg-red-950/50 p-2 rounded border border-red-800/80';
+                div.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> 오류: ${escapeHtml(msg)}`;
+            } else if (type === 'success') {
+                div.className = 'text-emerald-300 font-bold bg-emerald-950/80 p-2.5 rounded border border-emerald-600 shadow';
+                div.innerHTML = `<i class="fa-solid fa-circle-check text-base mr-1"></i> 정답입니다! 축하합니다.`;
+            } else if (type === 'fail') {
+                div.className = 'text-amber-300 font-semibold bg-amber-950/60 p-2 rounded border border-amber-700';
+                div.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> 아쉽네요! 출력이 요구사항과 다르거나 키워드가 부족합니다.`;
+            } else if (type === 'system') {
+                div.className = 'text-sky-300 text-xs py-1 border-b border-slate-800';
+                div.innerHTML = `<i class="fa-solid fa-info-circle mr-1"></i> ${escapeHtml(msg)}`;
+            } else if (type === 'input-echo') {
+                div.className = 'text-amber-300 font-medium pl-2 border-l-2 border-amber-500';
+                div.innerText = msg;
+            } else {
+                div.className = 'text-slate-100 font-mono leading-relaxed';
+                div.innerText = msg;
+            }
+            term.appendChild(div);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        async function runQuizCode(providedMockInputs = null) {
+            clearQuizTerminal();
+            globalVariables = {};
+            customFunctions = {};
+            
+            const code = document.getElementById('quiz-code-input').value;
+            quizCodes[currentQuizIdx] = code;
+
+            appendQuizOutput('--- 코드 실행 시작 ---', 'system');
+            
+            let outputs = [];
+            outputHandler = (msg, type) => {
+                outputs.push(msg);
+                appendQuizOutput(msg, type);
+            };
+
+            if (providedMockInputs) {
+                mockInputQueue = [...providedMockInputs];
+            } else {
+                mockInputQueue = null;
+            }
+
+            try {
+                isRunning = true;
+                const parsed = parseToBlocks(code);
+                await executeBlock(parsed, 0, 0, {});
+                appendQuizOutput('--- 코드 실행 완료 ---', 'system');
+            } catch(err) {
+                appendQuizOutput(err.message, 'error');
+            } finally {
+                isRunning = false;
+                outputHandler = null;
+                mockInputQueue = null;
+            }
+            return outputs.join('\n');
+        }
+
+        async function submitQuizAnswer() {
+            const code = document.getElementById('quiz-code-input').value;
+            
+            // Provide automatic test answers for quiz verification if required
+            let mockInputs = null;
+            if (currentQuizIdx === 3) {
+                mockInputs = ["1234"];
+            }
+
+            const outputLog = await runQuizCode(mockInputs);
+            const quiz = QUIZ_COURSE[currentQuizIdx];
+
+            if (quiz.check(outputLog, code)) {
+                quizStatus[currentQuizIdx] = true;
+                appendQuizOutput('', 'success');
+                renderQuizTabs();
+            } else {
+                appendQuizOutput('', 'fail');
+            }
+        }
+
+        function loadCurrentQuizToIDE() {
+            const code = document.getElementById('quiz-code-input').value;
+            codeInput.value = code;
+            switchView('ide');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function syncScroll() {
+            codeHighlight.scrollTop = codeInput.scrollTop;
+            codeHighlight.scrollLeft = codeInput.scrollLeft;
+            lineNumbers.scrollTop = codeInput.scrollTop;
+        }
+
+        function syncQuizScroll() {
+            const quizInput = document.getElementById('quiz-code-input');
+            const quizHighlight = document.getElementById('quiz-editor-highlight');
+            if (quizInput && quizHighlight) {
+                quizHighlight.scrollTop = quizInput.scrollTop;
+                quizHighlight.scrollLeft = quizInput.scrollLeft;
+            }
+        }
+
+        function updateCursorPos() {
+            const pos = codeInput.selectionStart;
+            const lines = codeInput.value.substring(0, pos).split('\n');
+            const row = lines.length;
+            const col = lines[lines.length - 1].length + 1;
+            document.getElementById('cursor-pos').innerText = `줄 ${row}, 열 ${col}`;
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = codeInput.selectionStart;
+                const end = codeInput.selectionEnd;
+                codeInput.value = codeInput.value.substring(0, start) + "    " + codeInput.value.substring(end);
+                codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+                updateEditor();
+            } else if (e.key === 'Enter') {
+                const autoIndent = document.getElementById('setting-autoindent').checked;
+                if (autoIndent) {
+                    const pos = codeInput.selectionStart;
+                    const lineStart = codeInput.value.lastIndexOf('\n', pos - 1) + 1;
+                    const currentLine = codeInput.value.substring(lineStart, pos);
+                    
+                    let indentMatch = currentLine.match(/^\s*/);
+                    let currentIndent = indentMatch ? indentMatch[0] : '';
+                    
+                    if (currentLine.trim().endsWith(':')) {
+                        currentIndent += '    ';
+                    }
+
+                    if (currentIndent.length > 0) {
+                        e.preventDefault();
+                        codeInput.value = codeInput.value.substring(0, pos) + '\n' + currentIndent + codeInput.value.substring(pos);
+                        codeInput.selectionStart = codeInput.selectionEnd = pos + 1 + currentIndent.length;
+                        updateEditor();
+                    }
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+
+        function highlightSyntax(text) {
+            const escapeChar = (str) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const tokenRegex = /(#.*)|("(?:[^"\\]|\\.)*"[가-힣]*)|(\b\d+\b)|(과 같다|와 같다|이 같다|가 같다|같다|과 다르다|와 다르다|다르다|보다 크거나 같다|보다 작거나 같다|크거나 같다|같거나 크다|작거나 같다|같거나 작다|보다 크다|보다 작다|또는|그리고)|(만약|아니라면 만약|아니라면|라면 실행하기:|라면 실행하기|라면:|면:|실행하기:|반복하기:|함수 만들기:|질문\s*출력하기(?:로|으로|를|을)?|출력하기(?:로|으로|를|을)?|정하기|연산하기)|([a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)/g;
+
+            let highlightedHtml = '';
+            let lastIndex = 0;
+            let match;
+
+            while ((match = tokenRegex.exec(text)) !== null) {
+                if (match.index > lastIndex) {
+                    highlightedHtml += escapeChar(text.substring(lastIndex, match.index));
+                }
+
+                const [fullMatch, comment, stringLit, numLit, operator, keyword, identifier] = match;
+
+                if (comment) {
+                    highlightedHtml += `<span class="hl-comment">${escapeChar(comment)}</span>`;
+                } else if (stringLit) {
+                    highlightedHtml += `<span class="hl-string">${escapeChar(stringLit)}</span>`;
+                } else if (numLit) {
+                    highlightedHtml += `<span class="hl-number">${escapeChar(numLit)}</span>`;
+                } else if (operator) {
+                    highlightedHtml += `<span class="hl-operator">${escapeChar(operator)}</span>`;
+                } else if (keyword) {
+                    highlightedHtml += `<span class="hl-keyword">${escapeChar(keyword)}</span>`;
+                } else if (identifier) {
+                    highlightedHtml += `<span class="hl-variable">${escapeChar(identifier)}</span>`;
+                } else {
+                    highlightedHtml += escapeChar(fullMatch);
+                }
+
+                lastIndex = tokenRegex.lastIndex;
+            }
+
+            if (lastIndex < text.length) {
+                highlightedHtml += escapeChar(text.substring(lastIndex));
+            }
+
+            return highlightedHtml + (text.endsWith('\n') ? '<br>' : '');
+        }
+
+        function updateEditor() {
+            const text = codeInput.value;
+            const lines = text.split('\n');
+            lineNumbers.innerHTML = lines.map((_, i) => i + 1).join('<br>');
+            document.getElementById('line-count').innerText = `총 ${lines.length}줄`;
+
+            codeHighlight.innerHTML = highlightSyntax(text);
+            syncScroll();
+            updateCursorPos();
+        }
+
+        function updateQuizEditor() {
+            const quizInput = document.getElementById('quiz-code-input');
+            const quizHighlight = document.getElementById('quiz-editor-highlight');
+            if (!quizInput || !quizHighlight) return;
+            quizHighlight.innerHTML = highlightSyntax(quizInput.value);
+            syncQuizScroll();
+        }
+
+        function insertCode(snippet) {
+            const start = codeInput.selectionStart;
+            const end = codeInput.selectionEnd;
+            const text = codeInput.value;
+            codeInput.value = text.substring(0, start) + snippet + text.substring(end);
+            codeInput.selectionStart = codeInput.selectionEnd = start + snippet.length;
+            updateEditor();
+            codeInput.focus();
+        }
+
+        function clearEditor() {
+            codeInput.value = "";
+            updateEditor();
+        }
+
+        function copyCode() {
+            document.execCommand('copy');
+        }
+
+        function clearTerminal() {
+            terminalOutput.innerHTML = '';
+            varInspector.innerHTML = '<div class="text-slate-500 italic text-center py-2">실행 중 저장된 변수가 여기에 표시됩니다.</div>';
+            document.getElementById('var-count').innerText = '0개 변수';
+        }
+
+        function appendOutput(msg, type = 'normal') {
+            if (outputHandler) {
+                outputHandler(msg, type);
+                return;
+            }
+            const div = document.createElement('div');
+            if (type === 'error') {
+                div.className = 'text-red-400 font-semibold bg-red-950/50 p-2 rounded border border-red-800/80';
+                div.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> 오류: ${escapeHtml(msg)}`;
+            } else if (type === 'system') {
+                div.className = 'text-sky-300 text-xs py-1 border-b border-slate-800';
+                div.innerHTML = `<i class="fa-solid fa-info-circle mr-1"></i> ${escapeHtml(msg)}`;
+            } else if (type === 'input-echo') {
+                div.className = 'text-amber-300 font-medium pl-2 border-l-2 border-amber-500';
+                div.innerText = msg;
+            } else {
+                div.className = 'text-slate-100 font-mono leading-relaxed';
+                div.innerText = msg;
+            }
+            terminalOutput.appendChild(div);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function updateVarDisplay() {
+            const keys = Object.keys(globalVariables);
+            document.getElementById('var-count').innerText = `${keys.length}개 변수`;
+            if (keys.length === 0) {
+                varInspector.innerHTML = '<div class="text-slate-500 italic text-center py-2">저장된 변수가 없습니다.</div>';
+                return;
+            }
+            varInspector.innerHTML = keys.map(k => {
+                let val = globalVariables[k];
+                let displayVal = typeof val === 'string' ? `"${val}"` : val;
+                return `<div class="flex justify-between items-center bg-slate-900/90 px-2 py-1 rounded border border-slate-800">
+                    <span class="text-sky-300 font-semibold">${escapeHtml(k)}</span>
+                    <span class="text-yellow-300">${escapeHtml(String(displayVal))}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function requestInput(promptText) {
+            return new Promise((resolve) => {
+                if (mockInputQueue && mockInputQueue.length > 0) {
+                    const mockVal = mockInputQueue.shift();
+                    appendOutput(`[자동 입력 모의값]: ${mockVal}`, 'input-echo');
+                    resolve(mockVal);
+                    return;
+                }
+
+                if (currentView === 'quiz') {
+                    document.getElementById('quiz-input-prompt-text').innerText = promptText;
+                    document.getElementById('quiz-terminal-input-container').classList.remove('hidden');
+                    document.getElementById('quiz-terminal-input').focus();
+                } else {
+                    document.getElementById('input-prompt-text').innerText = promptText;
+                    document.getElementById('terminal-input-container').classList.remove('hidden');
+                    document.getElementById('terminal-input').focus();
+                }
+                pendingInputResolve = resolve;
+            });
+        }
+
+        function submitTerminalInput(e) {
+            e.preventDefault();
+            const inputEl = document.getElementById('terminal-input');
+            const val = inputEl.value;
+            inputEl.value = '';
+            document.getElementById('terminal-input-container').classList.add('hidden');
+            appendOutput(`입력값: ${val}`, 'input-echo');
+            if (pendingInputResolve) {
+                const resolve = pendingInputResolve;
+                pendingInputResolve = null;
+                resolve(val);
+            }
+        }
+
+        function submitQuizTerminalInput(e) {
+            e.preventDefault();
+            const inputEl = document.getElementById('quiz-terminal-input');
+            const val = inputEl.value;
+            inputEl.value = '';
+            document.getElementById('quiz-terminal-input-container').classList.add('hidden');
+            appendQuizOutput(`입력값: ${val}`, 'input-echo');
+            if (pendingInputResolve) {
+                const resolve = pendingInputResolve;
+                pendingInputResolve = null;
+                resolve(val);
+            }
+        }
+
+        // Top-Level String-Aware Splitter Helper
+        function splitTopLevel(str, delimiter) {
+            if (!str) return [];
+            let result = [];
+            let current = '';
+            let inString = false;
+            let quoteChar = '';
+            
+            for (let i = 0; i < str.length; i++) {
+                let char = str[i];
+                if ((char === '"' || char === "'") && (i === 0 || str[i-1] !== '\\')) {
+                    if (!inString) {
+                        inString = true;
+                        quoteChar = char;
+                    } else if (char === quoteChar) {
+                        inString = false;
+                    }
+                }
+                
+                if (!inString && str.startsWith(delimiter, i)) {
+                    result.push(current);
+                    current = '';
+                    i += delimiter.length - 1;
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current);
+            return result;
+        }
+
+        function isInsideQuotes(str) {
+            str = str.trim();
+            return (str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"));
+        }
+
+        // Particle Stripper Helper
+        function stripParticle(token, env = {}) {
+            if (typeof token !== 'string') return token;
+            token = token.trim();
+            if (!token) return token;
+
+            const particles = [
+                '이라도', '라도', '이랑', '에서', '부터', '까지', '으로',
+                '은', '는', '이', '가', '을', '를', '과', '와', '랑', '에', '로', '도', '보다'
+            ];
+
+            let stringMatch = token.match(/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')([가-힣]+)$/);
+            if (stringMatch) {
+                let coreLiteral = stringMatch[1];
+                let particle = stringMatch[2];
+                if (particles.includes(particle)) {
+                    return coreLiteral;
+                }
+            }
+
+            if (token in env || token in globalVariables) return token;
+
+            if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
+                return token;
+            }
+
+            for (let p of particles) {
+                if (token.endsWith(p) && token.length > p.length) {
+                    let base = token.slice(0, -p.length);
+                    if (base in env || base in globalVariables || !isNaN(base) || (base.startsWith('"') && base.endsWith('"'))) {
+                        return base;
+                    }
+                }
+            }
+
+            for (let p of particles) {
+                if (token.endsWith(p) && token.length > p.length) {
+                    return token.slice(0, -p.length);
+                }
+            }
+
+            return token;
+    }
+
+    async function evalExpression(expr, env = {}) {
+        if (expr === undefined || expr === null) return "";
+        expr = String(expr).trim();
+        if (!expr) return "";
+
+        // 1. Question / Input Prompt ("..." 질문 출력하기)
+        if (!isInsideQuotes(expr)) {
+            let qMatch = expr.match(/^(.*?)\s*(?:질문\s*출력하기|질문출력하기)(?:로|으로|를|을)?$/);
+            if (qMatch) {
+                let promptStr = qMatch[1].trim();
+                let evaluatedPrompt = await evalExpression(promptStr, env);
+                return await requestInput(evaluatedPrompt);
+            }
+        }
+
+        // 2. Logical OR (" 또는 ")
+        let orParts = splitTopLevel(expr, ' 또는 ');
+        if (orParts.length > 1) {
+            for (let part of orParts) {
+                if (await evalExpression(part, env)) return true;
+            }
+            return false;
+        }
+
+        // 3. Logical AND (" 그리고 ")
+        let andParts = splitTopLevel(expr, ' 그리고 ');
+        if (andParts.length > 1) {
+            for (let part of andParts) {
+                if (!(await evalExpression(part, env))) return false;
+            }
+            return true;
+        }
+
+        // 4. Relational Comparison (SOV / SVO Support for Hangul)
+        const relOps = [
+            { keywords: ['크거나 같다', '크거나 같', '같거나 크다', '같거나 크', '이상이다', '이상'], type: '>=' },
+            { keywords: ['작거나 같다', '작거나 같', '같거나 작다', '같거나 작', '이하이다', '이하'], type: '<=' },
+            { keywords: ['초과이다', '초과', '크다', '크'], type: '>' },
+            { keywords: ['미만이다', '미만', '작다', '작'], type: '<' }
+        ];
+
+        for (let item of relOps) {
+            for (let kw of item.keywords) {
+                if (expr.includes(kw)) {
+                    let parts = expr.split(kw);
+                    let rawLeft = parts[0].trim();
+                    let rawRight = parts[1] ? parts[1].trim() : '';
+
+                    let leftExpr = '', rightExpr = '';
+
+                    if (rawLeft.includes('보다')) {
+                        let subParts = rawLeft.split('보다');
+                        let beforeBoda = subParts[0].trim();
+                        let afterBoda = subParts[1].trim();
+
+                        if (afterBoda) {
+                            rightExpr = beforeBoda;
+                            leftExpr = afterBoda;
+                        } else {
+                            let match = beforeBoda.match(/^(.*?)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+\b|[a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)\s*(?:이|가|은|는)?$/);
+                            if (match && match[1].trim()) {
+                                leftExpr = match[1].trim();
+                                rightExpr = match[2].trim();
+                            } else {
+                                let tokens = beforeBoda.split(/\s+/);
+                                if (tokens.length >= 2) {
+                                    rightExpr = tokens.pop();
+                                    leftExpr = tokens.join(' ');
+                                } else {
+                                    leftExpr = beforeBoda;
+                                    rightExpr = rawRight;
+                                }
+                            }
+                        }
+                    } else {
+                        let match = rawLeft.match(/^(.*?)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+\b|[a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)\s*(?:이|가|은|는)?$/);
+                        if (match && match[1].trim()) {
+                            leftExpr = match[1].trim();
+                            rightExpr = match[2].trim();
+                        } else {
+                            let tokens = rawLeft.split(/\s+/);
+                            if (tokens.length >= 2) {
+                                rightExpr = tokens.pop();
+                                leftExpr = tokens.join(' ');
+                            } else {
+                                leftExpr = rawLeft;
+                                rightExpr = rawRight;
+                            }
+                        }
+                    }
+
+                    if (leftExpr && rightExpr) {
+                        let leftVal = await evalExpression(leftExpr, env);
+                        let rightVal = await evalExpression(rightExpr, env);
+
+                        let numL = Number(leftVal);
+                        let numR = Number(rightVal);
+
+                        if (!isNaN(numL) && !isNaN(numR) && leftVal !== '' && rightVal !== '') {
+                            if (item.type === '>=') return numL >= numR;
+                            if (item.type === '<=') return numL <= numR;
+                            if (item.type === '>')  return numL > numR;
+                            if (item.type === '<')  return numL < numR;
+                        } else {
+                            if (item.type === '>=') return String(leftVal) >= String(rightVal);
+                            if (item.type === '<=') return String(leftVal) <= String(rightVal);
+                            if (item.type === '>')  return String(leftVal) > String(rightVal);
+                            if (item.type === '<')  return String(leftVal) < String(rightVal);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Equality Comparison
+        const eqKeywords = ['과 같다', '와 같다', '이 같다', '가 같다', '과 같', '와 같', '이 같', '가 같', ' 같음', ' 이다', ' 같다', ' 같'];
+        for (let eqKw of eqKeywords) {
+            if (expr.includes(eqKw)) {
+                let parts = expr.split(eqKw);
+                let leftPart = parts[0].trim();
+                let rightPart = parts[1] ? parts[1].trim() : '';
+
+                let leftVal, rightVal;
+                if (!rightPart) {
+                    let stringMatch = leftPart.match(/^(.*?)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+\b|[a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)\s*(?:과|와|이|가)?$/);
+                    if (stringMatch && stringMatch[1].trim()) {
+                        leftVal = await evalExpression(stringMatch[1].trim(), env);
+                        rightVal = await evalExpression(stringMatch[2].trim(), env);
+                    } else {
+                        let subParts = leftPart.split(/\s+/);
+                        if (subParts.length >= 2) {
+                            leftVal = await evalExpression(subParts[0].trim(), env);
+                            rightVal = await evalExpression(subParts.slice(1).join(' ').trim(), env);
+                        }
+                    }
+                } else {
+                    leftVal = await evalExpression(leftPart, env);
+                    rightVal = await evalExpression(rightPart, env);
+                }
+
+                if (leftVal !== undefined && rightVal !== undefined) {
+                    return String(leftVal) === String(rightVal) || leftVal == rightVal;
+                }
+            }
+        }
+
+        // 6. Inequality Comparison
+        const neqKeywords = ['과 다르다', '와 다르다', '이 다르다', '가 다르다', '과 다르', '와 다르', '이 다르', '가 다르', ' 다르다', ' 다름', ' 아니다', ' 다르'];
+        for (let neqKw of neqKeywords) {
+            if (expr.includes(neqKw)) {
+                let parts = expr.split(neqKw);
+                let leftPart = parts[0].trim();
+                let rightPart = parts[1] ? parts[1].trim() : '';
+
+                let leftVal, rightVal;
+                if (!rightPart) {
+                    let stringMatch = leftPart.match(/^(.*?)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+\b|[a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)\s*(?:과|와|이|가)?$/);
+                    if (stringMatch && stringMatch[1].trim()) {
+                        leftVal = await evalExpression(stringMatch[1].trim(), env);
+                        rightVal = await evalExpression(stringMatch[2].trim(), env);
+                    } else {
+                        let subParts = leftPart.split(/\s+/);
+                        if (subParts.length >= 2) {
+                            leftVal = await evalExpression(subParts[0].trim(), env);
+                            rightVal = await evalExpression(subParts.slice(1).join(' ').trim(), env);
+                        }
+                    }
+                } else {
+                    leftVal = await evalExpression(leftPart, env);
+                    rightVal = await evalExpression(rightPart, env);
+                }
+
+                if (leftVal !== undefined && rightVal !== undefined) {
+                    return String(leftVal) !== String(rightVal) && leftVal != rightVal;
+                }
+            }
+        }
+
+        // 7. Addition / String Concatenation (+)
+        let addParts = splitTopLevel(expr, '+');
+            if (addParts.length > 1) {
+                let result = await evalExpression(addParts[0], env);
+                for (let k = 1; k < addParts.length; k++) {
+                    let nextVal = await evalExpression(addParts[k], env);
+                    if (!isNaN(result) && !isNaN(nextVal) && result !== '' && nextVal !== '' && typeof result !== 'boolean' && typeof nextVal !== 'boolean') {
+                        result = Number(result) + Number(nextVal);
+                    } else {
+                        result = String(result) + String(nextVal);
+                    }
+                }
+                return result;
+            }
+
+            // 8. Subtraction (-)
+            let subParts = splitTopLevel(expr, '-');
+            if (subParts.length > 1 && subParts[0].trim() !== '') {
+                let result = Number(await evalExpression(subParts[0], env));
+                for (let k = 1; k < subParts.length; k++) {
+                    result -= Number(await evalExpression(subParts[k], env));
+                }
+                return result;
+            }
+
+            // 9. Multiplication (*)
+            let mulParts = splitTopLevel(expr, '*');
+            if (mulParts.length > 1) {
+                let result = Number(await evalExpression(mulParts[0], env));
+                for (let k = 1; k < mulParts.length; k++) {
+                    result *= Number(await evalExpression(mulParts[k], env));
+                }
+                return result;
+            }
+
+            // 10. Division (/)
+            let divParts = splitTopLevel(expr, '/');
+            if (divParts.length > 1) {
+                let result = Number(await evalExpression(divParts[0], env));
+                for (let k = 1; k < divParts.length; k++) {
+                    result /= Number(await evalExpression(divParts[k], env));
+                }
+                return result;
+            }
+
+            // 11. Literals and Variables
+            if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
+                return expr.slice(1, -1);
+            }
+
+            if (!isNaN(expr) && expr !== '') {
+                return Number(expr);
+            }
+
+            if (expr === '참' || expr === '진실' || expr === 'true') return true;
+            if (expr === '거짓' || expr === 'false') return false;
+
+            let strippedKey = stripParticle(expr, env);
+            if (strippedKey in env) {
+                return env[strippedKey];
+            }
+            if (strippedKey in globalVariables) {
+                return globalVariables[strippedKey];
+            }
+
+            return expr;
+        }
+
+        function parseToBlocks(code) {
+            const rawLines = code.split('\n');
+            const lines = [];
+
+            for (let i = 0; i < rawLines.length; i++) {
+                let raw = rawLines[i];
+                if (!raw.trim() || raw.trim().startsWith('#')) continue;
+
+                let indent = 0;
+                while (indent < raw.length && (raw[indent] === ' ' || raw[indent] === '\t')) {
+                    indent += (raw[indent] === '\t' ? 4 : 1);
+                }
+
+                lines.push({
+                    text: raw.trim(),
+                    indent: indent,
+                    lineNum: i + 1
+                });
+            }
+            return lines;
+        }
+
+        async function executeBlock(lines, startIndex, currentIndent, env) {
+            let i = startIndex;
+            let lastConditionMatched = false;
+
+            while (i < lines.length) {
+                if (!isRunning) break;
+
+                let line = lines[i];
+                let text = line.text;
+
+                if (line.indent < currentIndent) {
+                    return i;
+                }
+
+                // Output / Question
+                if (text.includes('출력하기') && !text.includes('정하기')) {
+                    lastConditionMatched = false;
+                    if (text.includes('질문')) {
+                        let qMatch = text.match(/^(.*?)\s*(?:질문\s*출력하기|질문출력하기)(?:로|으로|를|을)?$/);
+                        let promptStr = qMatch ? qMatch[1].trim() : text.replace(/(?:질문\s*출력하기|질문출력하기).*$/, '').trim();
+                        let evaluatedPrompt = await evalExpression(promptStr, env);
+                        await requestInput(evaluatedPrompt);
+                    } else {
+                        let expr = text.replace(/출력하기$/, '').trim();
+                        let val = await evalExpression(expr, env);
+                        appendOutput(String(val));
+                    }
+                    i++;
+                }
+                // Variable Assignment
+                else if (text.includes('정하기')) {
+                    lastConditionMatched = false;
+                    let match = text.match(/^(.+?)(?:을|를)?\s+(.+?)(?:으로|로|을|를|에)?\s*정하기$/);
+                    if (match) {
+                        let varName = stripParticle(match[1].trim(), env);
+                        let expr = match[2].trim();
+                        let val = await evalExpression(expr, env);
+                        globalVariables[varName] = val;
+                        updateVarDisplay();
+                    } else {
+                        let parts = text.split('정하기')[0].split(/(?:으로|로)/);
+                        if (parts.length >= 2) {
+                            let varName = stripParticle(parts[0].trim(), env);
+                            let val = await evalExpression(parts[1].trim(), env);
+                            globalVariables[varName] = val;
+                            updateVarDisplay();
+                        }
+                    }
+                    i++;
+                }
+                // Arithmetic Operation
+                else if (text.includes('연산하기')) {
+                    lastConditionMatched = false;
+                    let parts = text.split('에');
+                    let varName = stripParticle(parts[0].trim(), env);
+                    let expr = parts.slice(1).join('에').replace('연산하기', '').trim();
+                    let val = await evalExpression(expr, env);
+                    globalVariables[varName] = val;
+                    updateVarDisplay();
+                    i++;
+                }
+                // Function Definition
+                else if (text.includes('함수 만들기:')) {
+                    lastConditionMatched = false;
+                    let funcMatch = text.match(/^([a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)\s*\((.*?)\)\s*함수\s*만들기:?$/);
+                    if (funcMatch) {
+                        let funcName = funcMatch[1].trim();
+                        let params = funcMatch[2].split(',').map(p => p.trim()).filter(Boolean);
+                        let bodyIndent = (i + 1 < lines.length && lines[i + 1].indent > currentIndent) ? lines[i + 1].indent : currentIndent + 4;
+                        let bodyLines = [];
+                        i++;
+                        while (i < lines.length && lines[i].indent >= bodyIndent) {
+                            bodyLines.push(lines[i]);
+                            i++;
+                        }
+                        customFunctions[funcName] = { params, bodyLines, indent: bodyIndent };
+                    } else {
+                        i++;
+                    }
+                }
+                // Function Call
+                else if (text.match(/^([a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)\s*\((.*?)\)$/)) {
+                    lastConditionMatched = false;
+                    let callMatch = text.match(/^([a-zA-Z_가-힣][a-zA-Z0-9_가-힣]*)\s*\((.*?)\)$/);
+                    let funcName = callMatch[1].trim();
+                    let rawArgs = callMatch[2].split(',').map(a => a.trim()).filter(a => a !== '');
+                    if (customFunctions[funcName]) {
+                        let func = customFunctions[funcName];
+                        let localEnv = { ...env };
+                        for (let pIdx = 0; pIdx < func.params.length; pIdx++) {
+                            let paramName = func.params[pIdx];
+                            let argVal = rawArgs[pIdx] ? await evalExpression(rawArgs[pIdx], env) : "";
+                            localEnv[paramName] = argVal;
+                        }
+                        await executeBlock(func.bodyLines, 0, func.indent, localEnv);
+                    }
+                    i++;
+                }
+                // If Statement
+                else if (text.startsWith('만약')) {
+                    let condExpr = text.replace(/^만약/, '')
+                                       .replace(/(?:라면\s*실행하기|라면|면|실행하기|같더라도|더라도):?$/, '')
+                                       .replace(/:$/, '')
+                                       .trim();
+                    let condVal = await evalExpression(condExpr, env);
+                    
+                    let bodyIndent = (i + 1 < lines.length && lines[i + 1].indent > currentIndent) ? lines[i + 1].indent : currentIndent + 4;
+                    if (condVal) {
+                        lastConditionMatched = true;
+                        i = await executeBlock(lines, i + 1, bodyIndent, env);
+                    } else {
+                        lastConditionMatched = false;
+                        i++;
+                        while (i < lines.length && lines[i].indent >= bodyIndent) {
+                            i++;
+                        }
+                    }
+                }
+                // Else-If Statement
+                else if (text.startsWith('아니라면 만약') || text.startsWith('아니라면만약')) {
+                    let condExpr = text.replace(/^아니라면\s*만약/, '')
+                                       .replace(/(?:라면\s*실행하기|라면|면|실행하기|같더라도|더라도):?$/, '')
+                                       .replace(/:$/, '')
+                                       .trim();
+                    let bodyIndent = (i + 1 < lines.length && lines[i + 1].indent > currentIndent) ? lines[i + 1].indent : currentIndent + 4;
+
+                    if (!lastConditionMatched) {
+                        let condVal = await evalExpression(condExpr, env);
+                        if (condVal) {
+                            lastConditionMatched = true;
+                            i = await executeBlock(lines, i + 1, bodyIndent, env);
+                        } else {
+                            i++;
+                            while (i < lines.length && lines[i].indent >= bodyIndent) {
+                                i++;
+                            }
+                        }
+                    } else {
+                        i++;
+                        while (i < lines.length && lines[i].indent >= bodyIndent) {
+                            i++;
+                        }
+                    }
+                }
+                // Else Statement
+                else if (text.startsWith('아니라면')) {
+                    let bodyIndent = (i + 1 < lines.length && lines[i + 1].indent > currentIndent) ? lines[i + 1].indent : currentIndent + 4;
+                    if (!lastConditionMatched) {
+                        lastConditionMatched = true;
+                        i = await executeBlock(lines, i + 1, bodyIndent, env);
+                    } else {
+                        i++;
+                        while (i < lines.length && lines[i].indent >= bodyIndent) {
+                            i++;
+                        }
+                    }
+                }
+                // Loop Block
+                else if (text.endsWith('반복하기:')) {
+                    lastConditionMatched = false;
+                    let countExpr = text.replace(/번\s*반복하기:$/, '').trim();
+                    let count = Number(await evalExpression(countExpr, env)) || 0;
+                    let bodyIndent = (i + 1 < lines.length && lines[i + 1].indent > currentIndent) ? lines[i + 1].indent : currentIndent + 4;
+
+                    let blockStartIndex = i + 1;
+                    let nextIndex = blockStartIndex;
+                    while (nextIndex < lines.length && lines[nextIndex].indent >= bodyIndent) {
+                        nextIndex++;
+                    }
+
+                    for (let loop = 0; loop < count; loop++) {
+                        if (!isRunning) break;
+                        await executeBlock(lines, blockStartIndex, bodyIndent, env);
+                    }
+                    i = nextIndex;
+                }
+                else {
+                    lastConditionMatched = false;
+                    i++;
+                }
+            }
+
+            return i;
+        }
+
+        // Main Code Execution Handler
+        async function runCode() {
+            if (isRunning) return;
+
+            clearTerminal();
+            globalVariables = {};
+            customFunctions = {};
+            updateVarDisplay();
+
+            isRunning = true;
+            document.getElementById('btn-run').classList.add('hidden');
+            document.getElementById('btn-stop').classList.remove('hidden');
+            document.getElementById('exec-status').className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+
+            appendOutput('--- 프로그램 실행 시작 ---', 'system');
+
+            try {
+                const parsedLines = parseToBlocks(codeInput.value);
+                await executeBlock(parsedLines, 0, 0, {});
+                if (isRunning) {
+                    appendOutput('--- 프로그램 실행 완료 ---', 'system');
+                } else {
+                    appendOutput('--- 프로그램 실행 중지됨 ---', 'system');
+                }
+            } catch (err) {
+                appendOutput(`실행 중 오류 발생: ${err.message}`, 'error');
+            } finally {
+                stopExecution();
+            }
+        }
+
+        function stopExecution() {
+            isRunning = false;
+            document.getElementById('btn-run').classList.remove('hidden');
+            document.getElementById('btn-stop').classList.add('hidden');
+            document.getElementById('exec-status').className = 'w-2 h-2 rounded-full bg-slate-500';
+            document.getElementById('terminal-input-container').classList.add('hidden');
+            document.getElementById('quiz-terminal-input-container').classList.add('hidden');
+            if (pendingInputResolve) {
+                pendingInputResolve("");
+                pendingInputResolve = null;
+            }
+        }
+
+        function loadSample(type) {
+            if (type === 'greeting') codeInput.value = SAMPLE_USER_EXAMPLE;
+            else if (type === 'countdown') codeInput.value = SAMPLE_COUNTDOWN;
+            else if (type === 'func_demo') codeInput.value = SAMPLE_FUNC;
+            else if (type === 'gugudan') codeInput.value = SAMPLE_GUGUDAN;
+            else if (type === 'even_odd') codeInput.value = SAMPLE_EVEN_ODD;
+            else if (type === 'grade_calc') codeInput.value = SAMPLE_GRADE;
+            else if (type === 'sum_n') codeInput.value = SAMPLE_SUM_N;
+            else if (type === 'quiz_game') codeInput.value = SAMPLE_QUIZ_GAME;
+            else if (type === 'compare_num') codeInput.value = SAMPLE_COMPARE;
+            else if (type === 'intro_card') codeInput.value = SAMPLE_INTRO;
+            
+            updateEditor();
+            closeModal('example-modal');
+        }
+
+        function changeFontSize(size) {
+            codeInput.style.fontSize = size + 'px';
+            codeHighlight.style.fontSize = size + 'px';
+            lineNumbers.style.fontSize = size + 'px';
+            terminalOutput.style.fontSize = size + 'px';
+
+            const quizInput = document.getElementById('quiz-code-input');
+            const quizHighlight = document.getElementById('quiz-editor-highlight');
+            if (quizInput && quizHighlight) {
+                quizInput.style.fontSize = size + 'px';
+                quizHighlight.style.fontSize = size + 'px';
+            }
+
+            updateEditor();
+            updateQuizEditor();
+        }
+
+        function downloadCode() {
+            const blob = new Blob([codeInput.value], { type: 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'main.hcode';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function uploadCode(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                codeInput.value = evt.target.result;
+                updateEditor();
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function setupSplitResizer() {
+            const resizer = document.getElementById('resizer');
+            const leftPanel = document.getElementById('editor-panel');
+            const rightPanel = document.getElementById('terminal-panel');
+            const container = document.getElementById('main-container');
+
+            let isResizing = false;
+
+            resizer.addEventListener('mousedown', () => {
+                isResizing = true;
+                resizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const containerRect = container.getBoundingClientRect();
+                const mouseX = e.clientX - containerRect.left;
+                const totalWidth = containerRect.width;
+
+                let leftPercentage = (mouseX / totalWidth) * 100;
+                if (leftPercentage < 25) leftPercentage = 25;
+                if (leftPercentage > 80) leftPercentage = 80;
+
+                leftPanel.style.width = `${leftPercentage}%`;
+                rightPanel.style.width = `${100 - leftPercentage}%`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    resizer.classList.remove('resizing');
+                    document.body.style.cursor = 'default';
+                    document.body.style.userSelect = 'auto';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
